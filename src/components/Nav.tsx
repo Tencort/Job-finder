@@ -11,9 +11,10 @@ import { createClient } from "@/lib/supabase/client";
 export default function Nav() {
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
 
   async function handleLogout() {
+    // 이벤트 핸들러 내부에서 초기화 — SSR 시 Supabase URL 검증 오류 방지
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
