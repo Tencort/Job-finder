@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <div className="flex h-screen bg-gray-50">
       <Nav />
-      <main>{children}</main>
-    </>
+      <main className="flex-1 overflow-auto">{children}</main>
+    </div>
   );
 }

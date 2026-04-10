@@ -1,5 +1,5 @@
 /**
- * Role: 상단 네비게이션 바 — 로고 + 공고 새로고침/북마크/설정/로그아웃
+ * Role: 좌측 세로 사이드바 네비게이션 — 로고 + 공고 새로고침/북마크/설정/로그아웃
  * Dependencies: supabase/client
  */
 "use client";
@@ -42,33 +42,48 @@ export default function Nav() {
     }
   }
 
+  const menuItemClass = (active: boolean) =>
+    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition w-full text-left ${
+      active
+        ? "bg-gray-100 text-gray-900"
+        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+    }`;
+
   return (
-    <nav className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center gap-5">
-      <Link href="/" className="text-lg font-bold text-gray-900 mr-2">
+    <nav className="w-52 shrink-0 h-screen flex flex-col bg-white border-r border-gray-200 px-3 py-5">
+      {/* 로고 */}
+      <Link href="/" className="text-base font-bold text-gray-900 px-3 mb-6">
         통역공고 서치
       </Link>
-      <div className="flex gap-5 items-center text-sm text-gray-500 font-medium">
+
+      {/* 메인 메뉴 */}
+      <div className="flex flex-col gap-0.5">
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="hover:text-gray-900 transition disabled:opacity-40"
+          className={menuItemClass(false) + " disabled:opacity-40"}
           title="전체 플랫폼 공고 새로고침"
         >
+          <span className="text-base">🔄</span>
           {refreshing ? "수집 중..." : refreshDone ? "✓ 완료" : "새로고침"}
         </button>
-        <Link
-          href="/bookmarks"
-          className={`hover:text-gray-900 transition ${pathname === "/bookmarks" ? "text-gray-900" : ""}`}
-        >
+        <Link href="/bookmarks" className={menuItemClass(pathname === "/bookmarks")}>
+          <span className="text-base">🔖</span>
           북마크
         </Link>
-        <Link
-          href="/settings"
-          className={`hover:text-gray-900 transition ${pathname === "/settings" ? "text-gray-900" : ""}`}
-        >
+        <Link href="/settings" className={menuItemClass(pathname === "/settings")}>
+          <span className="text-base">⚙️</span>
           설정
         </Link>
-        <button onClick={handleLogout} className="hover:text-gray-900 transition">
+      </div>
+
+      {/* 로그아웃 — 하단 고정 */}
+      <div className="mt-auto">
+        <button
+          onClick={handleLogout}
+          className={menuItemClass(false)}
+        >
+          <span className="text-base">🚪</span>
           로그아웃
         </button>
       </div>
