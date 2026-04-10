@@ -15,14 +15,14 @@ import {
 import { MOCK_JOBS } from "@/lib/mock-jobs";
 
 export async function GET(request: NextRequest) {
-  // MOCK_MODE=true 시 목업 데이터로 UI 미리보기 지원
-  if (process.env.MOCK_MODE === "true") {
-    return NextResponse.json({ jobs: MOCK_JOBS, nextCursor: null });
-  }
-
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+
+  // MOCK_MODE=true 시 목업 데이터로 UI 미리보기 지원 (인증 후 개발 환경에서만)
+  if (process.env.MOCK_MODE === "true" && process.env.NODE_ENV !== "production") {
+    return NextResponse.json({ jobs: MOCK_JOBS, nextCursor: null });
+  }
 
   const params = request.nextUrl.searchParams;
   const sort = (params.get("sort") || "latest") as SortKey;
@@ -74,12 +74,17 @@ export async function GET(request: NextRequest) {
 
   // 커서 페이지네이션 (latest 정렬 기준)
   if (cursor && sort === "latest") {
+    // 커서 형식 검증: ISO날짜_숫자 형식만 허용
+    const cursorPattern = /^\d{4}-\d{2}-\d{2}T[\d:.Z+\-]+_\d+$/;
+    if (!cursorPattern.test(cursor)) {
+      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    }
     const [cursorDate, cursorId] = cursor.split("_");
     query = query.or(`created_at.lt.${cursorDate},and(created_at.eq.${cursorDate},id.lt.${cursorId})`);
   }
 
   const { data: jobs, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "데이터 조회 중 오류가 발생했습니다." }, { status: 500 });
 
   const hasMore = (jobs || []).length > limit;
   const results = hasMore ? jobs!.slice(0, limit) : (jobs || []);

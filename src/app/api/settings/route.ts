@@ -35,11 +35,19 @@ export async function PUT(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
 
-  const { email_alert } = await request.json();
+  let body: unknown;
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 }); }
+  const { email_alert } = body as Record<string, unknown>;
+
+  // email_alert는 boolean 이어야 함
+  if (typeof email_alert !== "boolean") {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+
   const { error } = await supabase
     .from("user_settings")
     .upsert({ user_id: user.id, email_alert, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "설정 저장 중 오류가 발생했습니다." }, { status: 500 });
   return NextResponse.json({ updated: true });
 }

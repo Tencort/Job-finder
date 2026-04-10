@@ -8,9 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 const PLATFORMS = ["saramin", "jobkorea", "linkedin", "indeed", "gsit", "wanted", "hufscit"];
 
 export async function GET(request: NextRequest) {
-  // Vercel Cron 인증
+  // Vercel Cron 인증 (환경변수 미설정 시 차단)
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "인증 실패" }, { status: 401 });
   }
 

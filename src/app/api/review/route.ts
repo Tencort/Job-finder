@@ -62,74 +62,73 @@ async function deleteBatch(
   return deleted;
 }
 
-export async function POST(request: NextRequest) {
-  // CRON_SECRET 인증
+// Vercel Cron 인증 검증 공통 함수
+function verifyCronAuth(request: NextRequest): boolean {
+  if (!process.env.CRON_SECRET) return false;
+  // Vercel Cron은 GET + Authorization: Bearer, 수동 트리거는 POST + x-cron-secret
+  const bearer = request.headers.get("authorization");
+  if (bearer === `Bearer ${process.env.CRON_SECRET}`) return true;
   const secret = request.headers.get("x-cron-secret");
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "인증 실패" }, { status: 401 });
-  }
+  return secret === process.env.CRON_SECRET;
+}
 
+async function runReview() {
   const supabase = createAdminClient();
-
-  // 1. 전체 공고 조회
   const allJobs = await fetchAllJobs(supabase);
   const total = allJobs.length;
 
-  // 2. 필터 위반 공고 판별
   const violationIds: number[] = [];
-
   for (const job of allJobs) {
     const titleLower = (job.title ?? "").toLowerCase();
     const company = job.company ?? "";
 
-    const hasExcludedLang = EXCLUDED_LANGUAGE_KEYWORDS.some((kw) =>
-      titleLower.includes(kw.toLowerCase())
-    );
+    const hasExcludedLang = EXCLUDED_LANGUAGE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
     if (hasExcludedLang) { violationIds.push(job.id); continue; }
 
-    const hasExcludedRole = EXCLUDED_ROLE_KEYWORDS.some((kw) =>
-      titleLower.includes(kw.toLowerCase())
-    );
+    const hasExcludedRole = EXCLUDED_ROLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
     if (hasExcludedRole) { violationIds.push(job.id); continue; }
 
-    const isBadCompany = [...MEDICAL_COMPANY_KEYWORDS, ...ACADEMY_COMPANY_KEYWORDS].some((kw) =>
-      company.includes(kw)
-    );
-    const isMedicalTitle = MEDICAL_TITLE_KEYWORDS.some((kw) =>
-      titleLower.includes(kw.toLowerCase())
-    );
+    const isBadCompany = [...MEDICAL_COMPANY_KEYWORDS, ...ACADEMY_COMPANY_KEYWORDS].some((kw) => company.includes(kw));
+    const isMedicalTitle = MEDICAL_TITLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
     if (isBadCompany || isMedicalTitle) { violationIds.push(job.id); continue; }
   }
 
-  // 3. 중복 판별 (title + company 완전 일치 → 최신 1건 유지)
-  // 필터 위반이 아닌 공고만 대상, 최신순 정렬 후 첫 번째만 보존
   const violationSet = new Set(violationIds);
   const remaining = allJobs
     .filter((j) => !violationSet.has(j.id))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at)); // 최신순
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const seenKeys = new Set<string>();
   const duplicateIds: number[] = [];
-
   for (const job of remaining) {
     const key = `${job.title?.trim()}|${job.company?.trim()}`;
     if (seenKeys.has(key)) {
-      // 이미 최신 건이 보존됨 → 이 건은 중복
       duplicateIds.push(job.id);
     } else {
       seenKeys.add(key);
     }
   }
 
-  // 4. 삭제 실행
   const deletedViolations = await deleteBatch(supabase, violationIds);
   const deletedDuplicates = await deleteBatch(supabase, duplicateIds);
 
-  return NextResponse.json({
-    status: "reviewed",
-    total,
-    deletedViolations,
-    deletedDuplicates,
-    remaining: total - deletedViolations - deletedDuplicates,
-  });
+  return { status: "reviewed", total, deletedViolations, deletedDuplicates, remaining: total - deletedViolations - deletedDuplicates };
+}
+
+// Vercel Cron 호출 (GET + Authorization: Bearer)
+export async function GET(request: NextRequest) {
+  if (!verifyCronAuth(request)) {
+    return NextResponse.json({ error: "인증 실패" }, { status: 401 });
+  }
+  const result = await runReview();
+  return NextResponse.json(result);
+}
+
+// 수동 트리거 (POST + x-cron-secret)
+export async function POST(request: NextRequest) {
+  if (!verifyCronAuth(request)) {
+    return NextResponse.json({ error: "인증 실패" }, { status: 401 });
+  }
+  const result = await runReview();
+  return NextResponse.json(result);
 }

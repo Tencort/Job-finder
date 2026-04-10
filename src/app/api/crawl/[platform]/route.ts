@@ -34,9 +34,9 @@ const crawlers: Record<Platform, () => Promise<{ platform: Platform; jobs: { pla
 export async function POST(request: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
   const { platform } = await params;
 
-  // 시크릿 검증
+  // 시크릿 검증 (환경변수 미설정 시 차단)
   const secret = request.headers.get("x-cron-secret");
-  if (secret !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "인증 실패" }, { status: 401 });
   }
 

@@ -10,6 +10,15 @@ import { PLATFORMS } from "@/lib/constants";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// 이메일 HTML에 삽입되는 문자열 XSS 방지용 이스케이프
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 // 3일 연속 실패 플랫폼 감지 + 어드민 알림
 async function checkCrawlerHealth(supabase: ReturnType<typeof createAdminClient>) {
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -82,8 +91,8 @@ async function notifyUsers(supabase: ReturnType<typeof createAdminClient>) {
     return `
       <div style="border:1px solid #e8e8e8;border-radius:8px;padding:14px;margin-bottom:10px;">
         <span style="background:${platform?.bgColor};color:${platform?.textColor};font-size:11px;padding:2px 6px;border-radius:3px;font-weight:600;">${platform?.label}</span>
-        <div style="font-weight:600;font-size:14px;margin:8px 0 4px;">${job.title}</div>
-        <div style="color:#888;font-size:12px;">${job.company}</div>
+        <div style="font-weight:600;font-size:14px;margin:8px 0 4px;">${escapeHtml(job.title)}</div>
+        <div style="color:#888;font-size:12px;">${escapeHtml(job.company)}</div>
       </div>
     `;
   }).join("");
