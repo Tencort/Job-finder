@@ -45,15 +45,10 @@ export async function GET(request: NextRequest) {
   query = query.or(`end_date.gte.${today},end_date.is.null`);
 
   // 통번역 관련 공고만 조회 — DB 쿼리 단에서 적용해야 페이지네이션이 정확함
-  // HUFS CIT·GSIT 등 전문 플랫폼은 모든 공고가 통번역 관련이므로 키워드 필터 우회
-  const KEYWORD_EXEMPT_PLATFORMS = ["hufscit", "gsit"];
   const keywordFilter = RELEVANT_TITLE_KEYWORDS
     .map((kw) => `title.ilike.%${kw}%`)
     .join(",");
-  const platformExempt = KEYWORD_EXEMPT_PLATFORMS
-    .map((p) => `platform.eq.${p}`)
-    .join(",");
-  query = query.or(`${keywordFilter},${platformExempt}`);
+  query = query.or(keywordFilter);
 
   // 플랫폼 필터
   if (platform !== "all") {
