@@ -44,6 +44,13 @@ export async function GET(request: NextRequest) {
   const today = new Date().toISOString().split("T")[0];
   query = query.or(`end_date.gte.${today},end_date.is.null`);
 
+  // 통번역 관련 공고만 조회 — DB 쿼리 단에서 적용해야 페이지네이션이 정확함
+  // JS 단 후처리 시 30개 fetch → N개 필터링 → 표시 개수 불일치 문제 발생
+  const keywordFilter = RELEVANT_TITLE_KEYWORDS
+    .map((kw) => `title.ilike.%${kw}%`)
+    .join(",");
+  query = query.or(keywordFilter);
+
   // 플랫폼 필터
   if (platform !== "all") {
     query = query.eq("platform", platform);
@@ -90,12 +97,7 @@ export async function GET(request: NextRequest) {
     ? `${results[results.length - 1].created_at}_${results[results.length - 1].id}`
     : null;
 
-  // 통번역 관련 공고만 표시 — 크롤러가 키워드 검색 결과를 긁어오므로
-  // 제목에 관련 키워드 없는 공고(예: "통역 우대" 조건만 있는 공고)를 제외
-  const filtered = results.filter((j) => {
-    const titleLower = (j.title ?? "").toLowerCase();
-    return RELEVANT_TITLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
-  });
+  const filtered = results;
 
   // 북마크 상태 조회
   const jobIds = filtered.map((j) => j.id);
