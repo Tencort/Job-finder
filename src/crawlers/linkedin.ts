@@ -1,13 +1,61 @@
 /**
- * Role: LinkedIn 크롤러 — 현재 비활성 스텁
- * Dependencies: base.ts
- * Notes: LinkedIn은 Cloudflare + JS 렌더링으로 정적 HTML 크롤링 불가.
- *        실제 구현 시 LinkedIn Jobs API 또는 헤드리스 브라우저(Playwright) 필요.
+ * Role: LinkedIn 공개 Guest API 크롤러 (로그인 불필요)
+ * Key Features: /jobs-guest/ 엔드포인트 활용, 키워드별 공고 수집
+ * Dependencies: base.ts, cheerio
+ * Notes: 공개 API — 셀렉터 변경 시 scripts/debug-linkedin.ts로 재확인
  */
-import type { CrawlerResult } from "./base";
+import * as cheerio from "cheerio";
+import type { CrawledJob } from "@/lib/types";
+import { SEARCH_KEYWORDS, fetchWithUA, delay, type CrawlerResult } from "./base";
+
+const GUEST_API = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search";
 
 export async function crawlLinkedin(): Promise<CrawlerResult> {
-  // Cloudflare 봇 차단 + 서버사이드 JS 렌더링으로 단순 fetch 불가
-  // 향후 LinkedIn Jobs API 연동 시 여기에 구현
-  return { platform: "linkedin", jobs: [] };
+  const allJobs: CrawledJob[] = [];
+  const seen = new Set<string>();
+
+  for (const keyword of SEARCH_KEYWORDS) {
+    try {
+      const url = `${GUEST_API}?keywords=${encodeURIComponent(keyword)}&location=South%20Korea&start=0`;
+      const html = await fetchWithUA(url);
+      const $ = cheerio.load(html);
+
+      $("li").each((_, el) => {
+        const $el = $(el);
+
+        const title = $el.find("h3").text().trim();
+        if (!title) return;
+
+        // job ID는 data-entity-urn에서 추출 (href URL 인코딩 문제 회피)
+        const urn = $el.find("[data-entity-urn]").attr("data-entity-urn") || "";
+        const idMatch = urn.match(/:(\d+)$/);
+        if (!idMatch) return;
+
+        const jobId = idMatch[1];
+        if (seen.has(jobId)) return;
+        seen.add(jobId);
+
+        const company = $el.find("h4").text().trim();
+        const href = $el.find("a.base-card__full-link").attr("href") || "";
+        // datetime 속성이 있으면 ISO 날짜, 없으면 null
+        const dateAttr = $el.find("time").attr("datetime") ?? null;
+
+        allJobs.push({
+          platform: "linkedin",
+          title,
+          company,
+          start_date: dateAttr,
+          end_date: null,
+          url: href.split("?")[0], // 트래킹 파라미터 제거
+          external_id: `linkedin_${jobId}`,
+        });
+      });
+
+      await delay(1500);
+    } catch {
+      // 키워드별 실패 시 스킵
+    }
+  }
+
+  return { platform: "linkedin", jobs: allJobs };
 }
