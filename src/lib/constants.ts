@@ -28,7 +28,9 @@ export const RELEVANT_TITLE_KEYWORDS = [
   // 자막/캡션
   '자막', 'subtitle', 'caption',
   // 언어 전문가
-   'linguistic', 'language specialist', '언어 전문',
+  'linguistic', 'language specialist', '언어 전문',
+  // 이중언어 (HUFS CIT 공고 패턴)
+  '이중언어',
 ];
 
 // 의료 관련 통역 공고 제외 필터
