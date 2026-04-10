@@ -1,22 +1,67 @@
 /**
  * Role: 잡코리아 HTML 파싱 크롤러
+ * Key Features: 임베디드 JSON에서 날짜 추출 (applicationPeriod), cheerio로 공고 목록 파싱
  * Dependencies: base.ts, cheerio
+ * Notes:
+ *   - span.text-typo-c1-13은 경력요건 텍스트 — 날짜 아님
+ *   - 실제 날짜는 페이지 HTML 내 임베디드 JSON의 applicationPeriod 필드에 있음
+ *   - 2070년 마감일 = 상시채용 → null 처리
  */
 import * as cheerio from "cheerio";
 import type { CrawledJob } from "@/lib/types";
 import { SEARCH_KEYWORDS, fetchWithUA, delay, type CrawlerResult } from "./base";
 
-// "03/26(목) 등록" 형식의 날짜 파싱
-function parseKoreanDate(text: string): string | null {
-  const match = text.match(/(\d{2})\/(\d{2})/);
-  if (!match) return null;
-  const month = parseInt(match[1]);
-  const day = parseInt(match[2]);
-  const now = new Date();
-  // 이미 지난 달이면 내년으로 처리
-  let year = now.getFullYear();
-  if (month < now.getMonth() + 1) year++;
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+/**
+ * ISO 날짜 문자열 → "YYYY-MM-DD" 변환
+ * 2070년은 상시채용으로 null 반환
+ */
+function isoToDate(iso: string): string | null {
+  if (!iso) return null;
+  const date = iso.substring(0, 10);
+  if (date.startsWith("2070")) return null; // 상시채용
+  return date;
+}
+
+/**
+ * HTML 내 임베디드 JSON에서 공고 id → 날짜 매핑 추출
+ * 잡코리아는 공고 목록 페이지에 applicationPeriod를 JSON blob으로 내장
+ * 일반 JSON과 이스케이프된 JSON 두 형식 모두 처리
+ */
+function buildDateMap(html: string): Map<string, { start: string | null; end: string | null }> {
+  const dateMap = new Map<string, { start: string | null; end: string | null }>();
+
+  // 일반 JSON: "applicationPeriod":{"start":"...","end":"..."}
+  const rawPattern = /"applicationPeriod":\{"start":"([^"]+)","end":"([^"]+)"\}/g;
+  // 이스케이프 JSON: \"applicationPeriod\":{\"start\":\"...\",\"end\":\"...\"}
+  const escapedPattern = /\\"applicationPeriod\\":\{\\"start\\":\\"([^\\]+)\\",\\"end\\":\\"([^\\]+)\\"\}/g;
+
+  for (const pattern of [rawPattern, escapedPattern]) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      const startIso = match[1];
+      const endIso = match[2];
+      const matchIndex = match.index;
+
+      // applicationPeriod 직전 3000자에서 가장 가까운 공고 id 탐색
+      const lookback = html.substring(Math.max(0, matchIndex - 3000), matchIndex);
+      const rawIds = [...lookback.matchAll(/"id":"(\d{7,9})"/g)];
+      const escapedIds = [...lookback.matchAll(/\\"id\\":\\"(\d{7,9})\\"/g)];
+      const allIds = [...rawIds, ...escapedIds].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      if (allIds.length === 0) continue;
+      // 가장 가까운(마지막) id 사용
+      const id = allIds[allIds.length - 1][1];
+
+      if (!dateMap.has(id)) {
+        dateMap.set(id, {
+          start: isoToDate(startIso),
+          end: isoToDate(endIso),
+        });
+      }
+    }
+  }
+
+  return dateMap;
 }
 
 export async function crawlJobkorea(): Promise<CrawlerResult> {
@@ -26,6 +71,10 @@ export async function crawlJobkorea(): Promise<CrawlerResult> {
     try {
       const url = `https://www.jobkorea.co.kr/Search/?stext=${encodeURIComponent(keyword)}&tabType=recruit`;
       const html = await fetchWithUA(url);
+
+      // 임베디드 JSON에서 날짜 맵 구성
+      const dateMap = buildDateMap(html);
+
       const $ = cheerio.load(html);
 
       // 제목이 있는 공고 링크만 선택
@@ -43,24 +92,17 @@ export async function crawlJobkorea(): Promise<CrawlerResult> {
 
         const jobId = jobIdMatch[1];
         const $card = $el.closest("div.w-full");
-
         const company = $card.find("span.text-typo-b2-16").first().text().trim();
 
-        // 날짜 텍스트 수집
-        const dateTexts = $card
-          .find("span.text-typo-c1-13")
-          .map((_, d) => $(d).text().trim())
-          .get();
-
-        const startRaw = dateTexts.find((t) => t.includes("등록"));
-        const endRaw = dateTexts.find((t) => t.includes("마감"));
+        // 임베디드 JSON 날짜 맵에서 날짜 조회
+        const dates = dateMap.get(jobId);
 
         allJobs.push({
           platform: "jobkorea",
           title,
           company,
-          start_date: startRaw ? parseKoreanDate(startRaw) : null,
-          end_date: endRaw ? parseKoreanDate(endRaw) : null,
+          start_date: dates?.start ?? null,
+          end_date: dates?.end ?? null,
           url: `https://www.jobkorea.co.kr/Recruit/GI_Read/${jobId}`,
           external_id: `jobkorea_${jobId}`,
         });

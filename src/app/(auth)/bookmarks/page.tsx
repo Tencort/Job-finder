@@ -51,7 +51,7 @@ export default function BookmarksPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {jobs.map((job) => (
-            <JobCard key={job.id} job={job} onBookmark={handleBookmark} onBlock={() => {}} />
+            <JobCard key={job.id} job={job} isNew={false} onBookmark={handleBookmark} onBlock={() => {}} />
           ))}
         </div>
       )}

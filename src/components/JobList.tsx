@@ -18,38 +18,73 @@ export default function JobList() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  // 이전 방문 시각 — 이후 생성된 공고에 "New!" 배지 표시
+  const [newThreshold, setNewThreshold] = useState<string | null>(null);
+  // 동시 요청 방지 — state의 loading은 렌더 타이밍 문제로 경쟁 조건 발생 가능
+  const loadingRef = useRef(false);
   const observerRef = useRef<HTMLDivElement>(null);
 
-  const fetchJobs = useCallback(async (reset = false) => {
-    if (loading) return;
+  // 이전 방문 시각을 localStorage에서 읽고, 현재 시각으로 갱신
+  useEffect(() => {
+    const prev = localStorage.getItem("lastVisitAt");
+    setNewThreshold(prev);
+    localStorage.setItem("lastVisitAt", new Date().toISOString());
+  }, []);
+
+  // 필터/정렬 변경 시 초기 로드 — sort·platform을 직접 캡처해 스테일 클로저 방지
+  useEffect(() => {
+    let cancelled = false;
+    loadingRef.current = true;
+    setLoading(true);
+    setJobs([]);
+    setCursor(null);
+    setHasMore(true);
+
+    const params = new URLSearchParams({ sort, platform });
+    fetch(`/api/jobs?${params}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setJobs(data.jobs ?? []);
+        setCursor(data.nextCursor);
+        setHasMore(!!data.nextCursor);
+      })
+      .catch(() => {
+        if (!cancelled) setJobs([]);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      loadingRef.current = false;
+    };
+  }, [sort, platform]);
+
+  // 다음 페이지 로드 — IntersectionObserver에서 호출
+  const fetchMore = useCallback(async () => {
+    if (loadingRef.current || !cursor) return;
+    loadingRef.current = true;
     setLoading(true);
 
     const params = new URLSearchParams({ sort, platform });
-    if (!reset && cursor) params.set("cursor", cursor);
+    params.set("cursor", cursor);
 
-    const res = await fetch(`/api/jobs?${params}`);
-    const data = await res.json();
-
-    setJobs((prev) => reset ? data.jobs : [...prev, ...data.jobs]);
-    setCursor(data.nextCursor);
-    setHasMore(!!data.nextCursor);
-    setLoading(false);
-  }, [sort, platform, cursor, loading]);
-
-  // 필터/정렬 변경 시 리셋
-  useEffect(() => {
-    setCursor(null);
-    setHasMore(true);
-    setJobs([]);
-    // fetchJobs는 다음 렌더에서 observer가 트리거
-  }, [sort, platform]);
-
-  // 초기 로드 + 리셋 후 로드
-  useEffect(() => {
-    if (jobs.length === 0 && hasMore) {
-      fetchJobs(true);
+    try {
+      const res = await fetch(`/api/jobs?${params}`);
+      const data = await res.json();
+      setJobs((prev) => [...prev, ...(data.jobs ?? [])]);
+      setCursor(data.nextCursor);
+      setHasMore(!!data.nextCursor);
+    } finally {
+      setLoading(false);
+      loadingRef.current = false;
     }
-  }, [jobs.length, hasMore]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sort, platform, cursor]);
 
   // 무한 스크롤 IntersectionObserver
   useEffect(() => {
@@ -58,15 +93,15 @@ export default function JobList() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
-          fetchJobs();
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          fetchMore();
         }
       },
       { threshold: 0.1 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loading, fetchJobs]);
+  }, [hasMore, fetchMore]);
 
   async function handleBookmark(jobId: string) {
     const res = await fetch("/api/bookmarks", {
@@ -87,7 +122,6 @@ export default function JobList() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ company_name: companyName }),
     });
-    // 블랙리스트 추가 후 해당 기업 공고 즉시 제거
     setJobs((prev) => prev.filter((j) => j.company !== companyName));
   }
 
@@ -101,7 +135,13 @@ export default function JobList() {
       </div>
       <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {jobs.map((job) => (
-          <JobCard key={job.id} job={job} onBookmark={handleBookmark} onBlock={handleBlock} />
+          <JobCard
+            key={job.id}
+            job={job}
+            isNew={newThreshold ? job.created_at > newThreshold : false}
+            onBookmark={handleBookmark}
+            onBlock={handleBlock}
+          />
         ))}
       </div>
       {/* 무한 스크롤 감지 영역 */}

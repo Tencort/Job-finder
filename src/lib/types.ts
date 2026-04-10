@@ -4,7 +4,7 @@
  * Dependencies: 없음
  */
 
-export type Platform = 'saramin' | 'jobkorea' | 'worknet' | 'linkedin' | 'indeed' | 'gsit';
+export type Platform = 'saramin' | 'jobkorea' | 'linkedin' | 'indeed' | 'gsit' | 'wanted' | 'hufscit';
 
 export interface Job {
   id: string;

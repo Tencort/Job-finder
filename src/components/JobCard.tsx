@@ -9,6 +9,7 @@ import type { Job } from "@/lib/types";
 
 interface JobCardProps {
   job: Job & { is_bookmarked: boolean };
+  isNew: boolean;
   onBookmark: (jobId: string) => void;
   onBlock: (companyName: string) => void;
 }
@@ -21,7 +22,7 @@ function getDday(endDate: string | null): { text: string; className: string } {
   return { text: `D-${diff}`, className: "text-amber-500" };
 }
 
-export default function JobCard({ job, onBookmark, onBlock }: JobCardProps) {
+export default function JobCard({ job, isNew, onBookmark, onBlock }: JobCardProps) {
   const platform = PLATFORMS.find((p) => p.key === job.platform);
   const dday = getDday(job.end_date);
 
@@ -33,14 +34,21 @@ export default function JobCard({ job, onBookmark, onBlock }: JobCardProps) {
       <div className="h-1" style={{ backgroundColor: platform?.color }} />
 
       <div className="p-[18px]">
-        {/* 헤더: 배지 + 북마크 */}
+        {/* 헤더: 배지 + New! + 북마크 */}
         <div className="flex justify-between items-center mb-2.5">
-          <span
-            className="text-[11px] font-semibold px-2 py-0.5 rounded"
-            style={{ backgroundColor: platform?.bgColor, color: platform?.textColor }}
-          >
-            {platform?.label}
-          </span>
+          <div className="flex gap-1.5 items-center">
+            <span
+              className="text-[11px] font-semibold px-2 py-0.5 rounded"
+              style={{ backgroundColor: platform?.bgColor, color: platform?.textColor }}
+            >
+              {platform?.label}
+            </span>
+            {isNew && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#e94560] text-white leading-none">
+                New!
+              </span>
+            )}
+          </div>
           <div className="flex gap-2 items-center">
             <button
               onClick={(e) => { e.stopPropagation(); onBlock(job.company); }}

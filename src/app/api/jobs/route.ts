@@ -2,16 +2,21 @@
  * Role: 공고 목록 조회 API — 커서 페이지네이션, 플랫폼 필터, 정렬, 블랙리스트 제외
  * Key Features: GET /api/jobs?sort=latest&platform=all&cursor=xxx&limit=30
  * Dependencies: supabase/server
+ * Notes:
+ *   - 필터 위반/중복 공고는 GEE-Reviewer(/api/review)가 DB에서 사전 정제
+ *   - 여기서는 통번역 관련성 표시 필터(RELEVANT_TITLE_KEYWORDS)만 적용
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { SortKey } from "@/lib/constants";
+import {
+  RELEVANT_TITLE_KEYWORDS,
+} from "@/lib/constants";
 import { MOCK_JOBS } from "@/lib/mock-jobs";
 
 export async function GET(request: NextRequest) {
-  // Supabase 미설정 시 목업 데이터로 UI 미리보기 지원
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl || supabaseUrl.startsWith("your_")) {
+  // MOCK_MODE=true 시 목업 데이터로 UI 미리보기 지원
+  if (process.env.MOCK_MODE === "true") {
     return NextResponse.json({ jobs: MOCK_JOBS, nextCursor: null });
   }
 
@@ -82,8 +87,15 @@ export async function GET(request: NextRequest) {
     ? `${results[results.length - 1].created_at}_${results[results.length - 1].id}`
     : null;
 
+  // 통번역 관련 공고만 표시 (DB 오염 데이터 방어용)
+  // 필터 위반/중복은 GEE-Reviewer가 DB에서 사전 정제하므로 여기서는 관련성만 확인
+  const filtered = results.filter((j) => {
+    const titleLower = (j.title ?? "").toLowerCase();
+    return RELEVANT_TITLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
+  });
+
   // 북마크 상태 조회
-  const jobIds = results.map((j) => j.id);
+  const jobIds = filtered.map((j) => j.id);
   const { data: bookmarks } = await supabase
     .from("bookmarks")
     .select("job_id")
@@ -91,7 +103,7 @@ export async function GET(request: NextRequest) {
   const bookmarkedIds = new Set((bookmarks || []).map((b) => b.job_id));
 
   return NextResponse.json({
-    jobs: results.map((j) => ({ ...j, is_bookmarked: bookmarkedIds.has(j.id) })),
+    jobs: filtered.map((j) => ({ ...j, is_bookmarked: bookmarkedIds.has(j.id) })),
     nextCursor,
   });
 }

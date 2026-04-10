@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
-const PLATFORMS = ["saramin", "worknet", "jobkorea", "linkedin", "indeed", "gsit"];
+const PLATFORMS = ["saramin", "jobkorea", "linkedin", "indeed", "gsit", "wanted", "hufscit"];
 
 export async function GET(request: NextRequest) {
   // Vercel Cron 인증

@@ -21,7 +21,7 @@ export const MOCK_JOBS: (Job & { is_bookmarked: boolean })[] = [
     url: "#", external_id: "mock-3", created_at: "2026-04-06T00:00:00Z", is_bookmarked: false,
   },
   {
-    id: "mock-4", platform: "worknet", title: "중한 통번역 전문가", company: "무역협회",
+    id: "mock-4", platform: "gsit", title: "중한 통번역 전문가", company: "무역협회",
     start_date: "2026-03-28", end_date: "2026-04-25",
     url: "#", external_id: "mock-4", created_at: "2026-03-28T00:00:00Z", is_bookmarked: false,
   },
@@ -46,7 +46,7 @@ export const MOCK_JOBS: (Job & { is_bookmarked: boolean })[] = [
     url: "#", external_id: "mock-8", created_at: "2026-04-08T00:00:00Z", is_bookmarked: false,
   },
   {
-    id: "mock-9", platform: "worknet", title: "국제회의 동시통역사 (프리랜서)", company: "코엑스",
+    id: "mock-9", platform: "wanted", title: "국제회의 동시통역사 (프리랜서)", company: "코엑스",
     start_date: "2026-04-02", end_date: "2026-04-15",
     url: "#", external_id: "mock-9", created_at: "2026-04-02T00:00:00Z", is_bookmarked: false,
   },

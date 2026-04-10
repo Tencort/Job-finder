@@ -10,7 +10,9 @@ import { crawlLinkedin } from "../src/crawlers/linkedin";
 import { crawlIndeed } from "../src/crawlers/indeed";
 import { crawlGsit } from "../src/crawlers/gsit";
 import { crawlSaramin } from "../src/crawlers/saramin";
-import { crawlWorknet } from "../src/crawlers/worknet";
+import { crawlWanted } from "../src/crawlers/wanted";
+import { crawlHufscit } from "../src/crawlers/hufscit";
+
 
 type CrawlerFn = () => Promise<{ platform: string; jobs: unknown[] }>;
 
@@ -19,8 +21,9 @@ const CRAWLERS: Record<string, CrawlerFn> = {
   linkedin: crawlLinkedin,
   indeed: crawlIndeed,
   gsit: crawlGsit,
+  wanted: crawlWanted,
   saramin: crawlSaramin,   // SARAMIN_API_KEY 환경변수 필요
-  worknet: crawlWorknet,   // WORKNET_API_KEY 환경변수 필요
+  hufscit: crawlHufscit,
 };
 
 async function run(targets: string[]) {
@@ -66,6 +69,6 @@ async function run(targets: string[]) {
 
 // 인수 없으면 HTML 크롤러 3개만 기본 실행 (API 키 불필요)
 const args = process.argv.slice(2);
-const targets = args.length > 0 ? args : ["jobkorea", "gsit", "linkedin", "indeed"];
+const targets = args.length > 0 ? args : ["jobkorea", "gsit", "linkedin", "indeed", "hufscit"];
 
 run(targets);
