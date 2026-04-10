@@ -9,9 +9,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { SortKey } from "@/lib/constants";
-import {
-  RELEVANT_TITLE_KEYWORDS,
-} from "@/lib/constants";
 import { MOCK_JOBS } from "@/lib/mock-jobs";
 
 export async function GET(request: NextRequest) {
@@ -92,12 +89,8 @@ export async function GET(request: NextRequest) {
     ? `${results[results.length - 1].created_at}_${results[results.length - 1].id}`
     : null;
 
-  // 통번역 관련 공고만 표시 (DB 오염 데이터 방어용)
-  // 필터 위반/중복은 GEE-Reviewer가 DB에서 사전 정제하므로 여기서는 관련성만 확인
-  const filtered = results.filter((j) => {
-    const titleLower = (j.title ?? "").toLowerCase();
-    return RELEVANT_TITLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
-  });
+  // GEE-Reviewer가 DB를 사전 정제하므로 별도 필터 불필요
+  const filtered = results;
 
   // 북마크 상태 조회
   const jobIds = filtered.map((j) => j.id);
