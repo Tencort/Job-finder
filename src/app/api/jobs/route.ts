@@ -6,8 +6,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { SortKey } from "@/lib/constants";
+import { MOCK_JOBS } from "@/lib/mock-jobs";
 
 export async function GET(request: NextRequest) {
+  // Supabase 미설정 시 목업 데이터로 UI 미리보기 지원
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl || supabaseUrl.startsWith("your_")) {
+    return NextResponse.json({ jobs: MOCK_JOBS, nextCursor: null });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
