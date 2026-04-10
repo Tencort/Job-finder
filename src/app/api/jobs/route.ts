@@ -28,6 +28,12 @@ export async function GET(request: NextRequest) {
   const cursor = params.get("cursor");
   const limit = 30;
 
+  // offset 기반 페이지네이션 — 모든 정렬에서 동작
+  if (cursor && !/^\d+$/.test(cursor)) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+  const offset = cursor ? parseInt(cursor, 10) : 0;
+
   // 블랙리스트 조회
   const { data: blocked } = await supabase
     .from("blocked_companies")
@@ -38,7 +44,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("jobs")
     .select("*")
-    .limit(limit + 1); // 다음 페이지 존재 여부 확인용 +1
+    .range(offset, offset + limit); // +1건 포함해서 다음 페이지 존재 여부 확인
 
   // 만료 공고 제외 (end_date가 오늘 이전이면 숨김, null은 표시)
   const today = new Date().toISOString().split("T")[0];
@@ -76,25 +82,12 @@ export async function GET(request: NextRequest) {
       break;
   }
 
-  // 커서 페이지네이션 (latest 정렬 기준)
-  if (cursor && sort === "latest") {
-    // 커서 형식 검증: ISO날짜_숫자 형식만 허용
-    const cursorPattern = /^\d{4}-\d{2}-\d{2}T[\d:.Z+\-]+_\d+$/;
-    if (!cursorPattern.test(cursor)) {
-      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
-    }
-    const [cursorDate, cursorId] = cursor.split("_");
-    query = query.or(`created_at.lt.${cursorDate},and(created_at.eq.${cursorDate},id.lt.${cursorId})`);
-  }
-
   const { data: jobs, error } = await query;
   if (error) return NextResponse.json({ error: "데이터 조회 중 오류가 발생했습니다." }, { status: 500 });
 
   const hasMore = (jobs || []).length > limit;
   const results = hasMore ? jobs!.slice(0, limit) : (jobs || []);
-  const nextCursor = hasMore && results.length > 0
-    ? `${results[results.length - 1].created_at}_${results[results.length - 1].id}`
-    : null;
+  const nextCursor = hasMore ? String(offset + limit) : null;
 
   const filtered = results;
 

@@ -16,7 +16,6 @@ export default function Nav() {
   const [refreshDone, setRefreshDone] = useState(false);
 
   async function handleLogout() {
-    // 이벤트 핸들러 내부에서 초기화 — SSR 시 Supabase URL 검증 오류 방지
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
@@ -28,10 +27,15 @@ export default function Nav() {
     setRefreshing(true);
     setRefreshDone(false);
 
+    // 새로고침 시작 시각 저장 — 완료 후 신규 공고 식별에 사용
+    const beforeRefresh = new Date().toISOString();
+
     try {
       await fetch("/api/refresh", { method: "POST" });
+      localStorage.setItem("lastRefreshedAt", beforeRefresh);
+      // JobList에 재로드 + 새 공고 식별 신호 전달
+      window.dispatchEvent(new CustomEvent("jobsRefreshed"));
       setRefreshDone(true);
-      // 2초 후 완료 메시지 사라짐
       setTimeout(() => setRefreshDone(false), 2000);
     } finally {
       setRefreshing(false);
@@ -39,8 +43,8 @@ export default function Nav() {
   }
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-6 py-3.5 flex justify-between items-center">
-      <Link href="/" className="text-lg font-bold text-gray-900">
+    <nav className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center gap-5">
+      <Link href="/" className="text-lg font-bold text-gray-900 mr-2">
         통역공고 서치
       </Link>
       <div className="flex gap-5 items-center text-sm text-gray-500 font-medium">

@@ -35,7 +35,7 @@ export const RELEVANT_TITLE_KEYWORDS = [
 
 // 의료 관련 통역 공고 제외 필터
 // 회사명에 아래 키워드가 포함되거나, 제목에 의료 통역 키워드가 포함된 공고는 숨김
-export const MEDICAL_COMPANY_KEYWORDS = ['병원', '의원', '클리닉', '메디컬'];
+export const MEDICAL_COMPANY_KEYWORDS = ['병원', '의원', '클리닉', '메디컬', '치과'];
 export const MEDICAL_TITLE_KEYWORDS = ['의료통역', '의료 통역', '병원통역', '병원 통역', 'medical'];
 
 // 학원/교육 업종 제외 — 회사명 기준
