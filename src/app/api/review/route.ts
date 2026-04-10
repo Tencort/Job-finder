@@ -17,6 +17,7 @@ import {
   MEDICAL_COMPANY_KEYWORDS,
   MEDICAL_TITLE_KEYWORDS,
   ACADEMY_COMPANY_KEYWORDS,
+  RELEVANT_TITLE_KEYWORDS,
 } from "@/lib/constants";
 
 // Supabase IN 절 최대 처리 건수
@@ -81,6 +82,10 @@ async function runReview() {
   for (const job of allJobs) {
     const titleLower = (job.title ?? "").toLowerCase();
     const company = job.company ?? "";
+
+    // 통번역 관련 키워드가 제목에 없으면 제외 (크롤러 검색 결과 중 무관 공고 제거)
+    const isRelevant = RELEVANT_TITLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
+    if (!isRelevant) { violationIds.push(job.id); continue; }
 
     const hasExcludedLang = EXCLUDED_LANGUAGE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
     if (hasExcludedLang) { violationIds.push(job.id); continue; }

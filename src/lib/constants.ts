@@ -19,9 +19,16 @@ export const SEARCH_KEYWORDS = ['통역', '번역', '통번역', 'translator', '
 
 // 제목에 아래 키워드 중 하나 이상 포함된 공고만 표시 (무관 공고 필터링)
 export const RELEVANT_TITLE_KEYWORDS = [
+  // 한국어 핵심 키워드
   '통역', '번역', '통번역',
+  // 영어 핵심 키워드
   'translator', 'translation', 'interpreter', 'interpretation',
+  // 현지화
   'localization', 'localisation', '현지화', '로컬라이',
+  // 자막/캡션
+  '자막', 'subtitle', 'caption',
+  // 언어 전문가
+   'linguistic', 'language specialist', '언어 전문',
 ];
 
 // 의료 관련 통역 공고 제외 필터

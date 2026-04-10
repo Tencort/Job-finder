@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { SortKey } from "@/lib/constants";
+import { RELEVANT_TITLE_KEYWORDS } from "@/lib/constants";
 import { MOCK_JOBS } from "@/lib/mock-jobs";
 
 export async function GET(request: NextRequest) {
@@ -89,8 +90,12 @@ export async function GET(request: NextRequest) {
     ? `${results[results.length - 1].created_at}_${results[results.length - 1].id}`
     : null;
 
-  // GEE-Reviewer가 DB를 사전 정제하므로 별도 필터 불필요
-  const filtered = results;
+  // 통번역 관련 공고만 표시 — 크롤러가 키워드 검색 결과를 긁어오므로
+  // 제목에 관련 키워드 없는 공고(예: "통역 우대" 조건만 있는 공고)를 제외
+  const filtered = results.filter((j) => {
+    const titleLower = (j.title ?? "").toLowerCase();
+    return RELEVANT_TITLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
+  });
 
   // 북마크 상태 조회
   const jobIds = filtered.map((j) => j.id);
