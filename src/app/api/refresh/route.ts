@@ -10,6 +10,7 @@
  *   - Reviewer가 크롤러와 동시에 실행돼도 무방 — 기존 DB 정제가 주목적
  */
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { createClient } from "@/lib/supabase/server";
 
 const PLATFORMS = ["saramin", "jobkorea", "linkedin", "indeed", "gsit", "wanted", "hufscit"];
@@ -25,13 +26,17 @@ export async function POST() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
   const cronHeader = { "x-cron-secret": process.env.CRON_SECRET! };
 
-  // GEE-Research: 전체 플랫폼 크롤러 fire-and-forget 실행
-  PLATFORMS.forEach((platform) => {
-    fetch(`${baseUrl}/api/crawl/${platform}`, { method: "POST", headers: cronHeader }).catch(() => {});
-  });
-
-  // GEE-Reviewer: 기존 DB 즉시 정제 (fire-and-forget)
-  fetch(`${baseUrl}/api/review`, { method: "POST", headers: cronHeader }).catch(() => {});
+  // waitUntil로 응답 반환 후에도 크롤러 + Reviewer 실행 보장
+  waitUntil(
+    Promise.all([
+      // GEE-Research: 전체 플랫폼 크롤러 병렬 실행
+      ...PLATFORMS.map((platform) =>
+        fetch(`${baseUrl}/api/crawl/${platform}`, { method: "POST", headers: cronHeader }).catch(() => {})
+      ),
+      // GEE-Reviewer: 기존 DB 정제
+      fetch(`${baseUrl}/api/review`, { method: "POST", headers: cronHeader }).catch(() => {}),
+    ])
+  );
 
   return NextResponse.json({ status: "triggered", platforms: PLATFORMS });
 }

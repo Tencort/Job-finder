@@ -4,6 +4,7 @@
  * Dependencies: crawl/[platform], notify API
  */
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 
 const PLATFORMS = ["saramin", "jobkorea", "linkedin", "indeed", "gsit", "wanted", "hufscit"];
 
@@ -16,14 +17,16 @@ export async function GET(request: NextRequest) {
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
-  // 6개 플랫폼 fire-and-forget 병렬 호출 — await 없음 (Vercel 10초 제한 회피)
-  PLATFORMS.forEach((platform) => {
-    fetch(`${baseUrl}/api/crawl/${platform}`, {
-      method: "POST",
-      headers: { "x-cron-secret": process.env.CRON_SECRET! },
-    }).catch(() => {}); // 개별 실패는 crawl_logs에 기록됨
-  });
+  const cronHeader = { "x-cron-secret": process.env.CRON_SECRET! };
 
-  // 오케스트레이터는 즉시 반환 — 이메일 알림은 별도 Cron(UTC 23:00)에서 트리거
+  // waitUntil로 응답 반환 후에도 크롤러 실행 보장
+  waitUntil(
+    Promise.all(
+      PLATFORMS.map((platform) =>
+        fetch(`${baseUrl}/api/crawl/${platform}`, { method: "POST", headers: cronHeader }).catch(() => {})
+      )
+    )
+  );
+
   return NextResponse.json({ status: "crawlers_triggered" });
 }
