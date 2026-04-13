@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
   const sort = (params.get("sort") || "latest") as SortKey;
   const platform = params.get("platform") || "all";
   const cursor = params.get("cursor");
+  const q = params.get("q") || "";
+  // 즐겨찾기 기업 키워드 — 콤마 구분 문자열
+  const companies = params.get("companies") || "";
   const limit = 30;
 
   // offset 기반 페이지네이션 — 모든 정렬에서 동작
@@ -56,8 +59,22 @@ export async function GET(request: NextRequest) {
     .join(",");
   query = query.or(keywordFilter);
 
-  // 플랫폼 필터
-  if (platform !== "all") {
+  // 검색 필터 (회사명 또는 제목)
+  if (q) {
+    query = query.or(`company.ilike.%${q}%,title.ilike.%${q}%`);
+  }
+
+  // 즐겨찾기 기업 필터 — platform=favorites 일 때만 적용
+  if (platform === "favorites" && companies) {
+    const companyList = companies.split(",").map((c) => c.trim()).filter(Boolean);
+    if (companyList.length > 0) {
+      const favFilter = companyList.map((c) => `company.ilike.%${c}%`).join(",");
+      query = query.or(favFilter);
+    }
+  }
+
+  // 플랫폼 필터 — favorites는 회사 키워드 필터로 대체하므로 제외
+  if (platform !== "all" && platform !== "favorites") {
     query = query.eq("platform", platform);
   }
 

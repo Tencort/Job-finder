@@ -1,6 +1,6 @@
 /**
- * Role: 공고 목록 + 무한 스크롤 + 새로고침 후 신규 공고 하이라이트 블록
- * Key Features: 접을 수 있는 New 블록, offset 기반 페이지네이션, 무한스크롤
+ * Role: 공고 목록 + 무한 스크롤 + 신규 공고 하이라이트 블록 + 검색 + 즐겨찾기
+ * Key Features: 오늘 생성 공고 New 배지, 검색(debounce), 즐겨찾기 기업 필터, 접을 수 있는 New 블록
  * Dependencies: JobCard, FilterBar
  */
 "use client";
@@ -15,11 +15,12 @@ export default function JobList() {
   const [jobs, setJobs] = useState<(Job & { is_bookmarked: boolean })[]>([]);
   const [sort, setSort] = useState<SortKey>("latest");
   const [platform, setPlatform] = useState("all");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [favoriteKeywords, setFavoriteKeywords] = useState<string[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  // 이전 방문 시각 — 이후 생성된 공고에 "New!" 배지 표시
-  const [newThreshold, setNewThreshold] = useState<string | null>(null);
   // 새로고침 후 신규 공고 기준 시각
   const [refreshThreshold, setRefreshThreshold] = useState<string | null>(null);
   // New 블록 열림 상태
@@ -28,18 +29,34 @@ export default function JobList() {
   const loadingRef = useRef(false);
   const observerRef = useRef<HTMLDivElement>(null);
 
+  // 오늘 날짜 (YYYY-MM-DD) — New 배지 기준
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // localStorage에서 즐겨찾기 키워드 복원
   useEffect(() => {
-    const prev = localStorage.getItem("lastVisitAt");
-    setNewThreshold(prev);
-    localStorage.setItem("lastVisitAt", new Date().toISOString());
+    try {
+      const saved = localStorage.getItem("favoriteKeywords");
+      if (saved) setFavoriteKeywords(JSON.parse(saved));
+    } catch { /* ignore */ }
   }, []);
+
+  function handleFavoriteKeywordsChange(keywords: string[]) {
+    setFavoriteKeywords(keywords);
+    localStorage.setItem("favoriteKeywords", JSON.stringify(keywords));
+  }
+
+  // 검색어 debounce (400ms)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
   // Nav 새로고침 완료 이벤트 수신
   useEffect(() => {
     function handleRefreshed() {
       const threshold = localStorage.getItem("lastRefreshedAt");
       setRefreshThreshold(threshold);
-      setNewBlockOpen(true); // 새로고침 시 블록 자동 열기
+      setNewBlockOpen(true);
       setSort("latest");
       setReloadKey((prev) => prev + 1);
     }
@@ -47,7 +64,7 @@ export default function JobList() {
     return () => window.removeEventListener("jobsRefreshed", handleRefreshed);
   }, []);
 
-  // 필터/정렬/재로드 변경 시 초기 로드
+  // 필터/정렬/검색/즐겨찾기 변경 시 초기 로드
   useEffect(() => {
     let cancelled = false;
     loadingRef.current = true;
@@ -57,6 +74,11 @@ export default function JobList() {
     setHasMore(true);
 
     const params = new URLSearchParams({ sort, platform });
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (platform === "favorites" && favoriteKeywords.length > 0) {
+      params.set("companies", favoriteKeywords.join(","));
+    }
+
     fetch(`/api/jobs?${params}`)
       .then((r) => r.json())
       .then((data) => {
@@ -77,7 +99,7 @@ export default function JobList() {
       cancelled = true;
       loadingRef.current = false;
     };
-  }, [sort, platform, reloadKey]);
+  }, [sort, platform, debouncedSearch, favoriteKeywords, reloadKey]);
 
   // 다음 페이지 로드
   const fetchMore = useCallback(async () => {
@@ -85,7 +107,12 @@ export default function JobList() {
     loadingRef.current = true;
     setLoading(true);
     try {
-      const res = await fetch(`/api/jobs?${new URLSearchParams({ sort, platform, cursor })}`);
+      const params = new URLSearchParams({ sort, platform, cursor });
+      if (debouncedSearch) params.set("q", debouncedSearch);
+      if (platform === "favorites" && favoriteKeywords.length > 0) {
+        params.set("companies", favoriteKeywords.join(","));
+      }
+      const res = await fetch(`/api/jobs?${params}`);
       const data = await res.json();
       setJobs((prev) => [...prev, ...(data.jobs ?? [])]);
       setCursor(data.nextCursor);
@@ -94,7 +121,7 @@ export default function JobList() {
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [sort, platform, cursor]);
+  }, [sort, platform, debouncedSearch, favoriteKeywords, cursor]);
 
   // 무한 스크롤 IntersectionObserver
   useEffect(() => {
@@ -144,14 +171,17 @@ export default function JobList() {
       <FilterBar
         sort={sort}
         platform={platform}
+        search={search}
+        favoriteKeywords={favoriteKeywords}
         onSortChange={setSort}
         onPlatformChange={setPlatform}
+        onSearchChange={setSearch}
+        onFavoriteKeywordsChange={handleFavoriteKeywordsChange}
       />
 
-      {/* ── New 블록 ── */}
+      {/* ── New 블록 (새로고침 후 신규 공고) ── */}
       {newJobs.length > 0 && (
         <div className="mx-6 mt-5 rounded-xl border border-blue-100 bg-blue-50 overflow-hidden">
-          {/* 헤더 */}
           <button
             onClick={() => setNewBlockOpen((prev) => !prev)}
             className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-blue-100 transition"
@@ -168,7 +198,6 @@ export default function JobList() {
             </span>
           </button>
 
-          {/* 카드 그리드 */}
           {newBlockOpen && (
             <div className={`px-5 pb-5 ${CARD_GRID}`}>
               {newJobs.map((job) => (
@@ -199,7 +228,8 @@ export default function JobList() {
           <JobCard
             key={job.id}
             job={job}
-            isNew={newThreshold ? job.created_at > newThreshold : false}
+            // 오늘 등록된 공고는 항상 New 배지 유지
+            isNew={job.created_at.startsWith(todayStr)}
             onBookmark={handleBookmark}
             onBlock={handleBlock}
           />
