@@ -64,10 +64,14 @@ function buildDateMap(html: string): Map<string, { start: string | null; end: st
   return dateMap;
 }
 
+// 한국 사이트 — 영어 키워드 검색 결과 미미하므로 한국어 3개만 사용
+const KO_KEYWORDS = ["통역", "번역", "통번역"];
+
 export async function crawlJobkorea(): Promise<CrawlerResult> {
   const allJobs: CrawledJob[] = [];
 
-  for (const keyword of SEARCH_KEYWORDS) {
+  // 키워드별로 순차 요청 (3개 × ~2s = ~6s, 10s 제한 이내)
+  for (const keyword of KO_KEYWORDS) {
     try {
       const url = `https://www.jobkorea.co.kr/Search/?stext=${encodeURIComponent(keyword)}&tabType=recruit`;
       const html = await fetchWithUA(url);
@@ -108,7 +112,7 @@ export async function crawlJobkorea(): Promise<CrawlerResult> {
         });
       });
 
-      await delay(1500);
+      await delay(300);
     } catch {
       // 키워드별 실패는 무시
     }

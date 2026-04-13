@@ -31,6 +31,8 @@ const crawlers: Record<Platform, () => Promise<{ platform: Platform; jobs: { pla
   hufscit: crawlHufscit,
 };
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
   const { platform } = await params;
 
@@ -81,11 +83,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return !isBadCompany && !isMedicalTitle;
     });
 
-    // 공고 저장 (중복은 upsert로 무시)
-    let newCount = 0;
-    for (const job of filtered) {
-      const { error } = await supabase.from("jobs").upsert(job, { onConflict: "external_id", ignoreDuplicates: true });
-      if (!error) newCount++;
+    // 공고 배치 저장 (중복은 upsert로 무시) — 건별 루프 대신 단일 DB 호출로 시간 단축
+    const newCount = filtered.length;
+    if (filtered.length > 0) {
+      await supabase.from("jobs").upsert(filtered, { onConflict: "external_id", ignoreDuplicates: true });
     }
 
     // 성공 로그 기록

@@ -78,7 +78,7 @@ export async function crawlSaramin(): Promise<CrawlerResult> {
         });
       });
 
-      await delay(1500); // 요청 간 딜레이 — 봇 차단 방지
+      await delay(300); // 서버사이드 1일 1회 요청 — 짧은 딜레이로 충분
     } catch {
       // 키워드별 실패는 무시하고 계속
     }

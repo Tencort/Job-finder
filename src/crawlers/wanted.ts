@@ -60,7 +60,7 @@ export async function crawlWanted(): Promise<CrawlerResult> {
         });
       }
 
-      await delay(1000);
+      await delay(200); // 서버사이드 1일 1회 요청 — 짧은 딜레이로 충분
     } catch {
       // 키워드별 실패는 무시
     }

@@ -42,6 +42,8 @@ export default function JobList() {
       const threshold = localStorage.getItem("lastRefreshedAt");
       setRefreshThreshold(threshold);
       setShowNewOnly(false);
+      // 신규 공고가 상단에 오도록 최신순으로 초기화
+      setSort("latest");
       setReloadKey((prev) => prev + 1);
     }
     window.addEventListener("jobsRefreshed", handleRefreshed);

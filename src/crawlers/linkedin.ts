@@ -11,14 +11,21 @@ import { SEARCH_KEYWORDS, fetchWithUA, delay, type CrawlerResult } from "./base"
 const GUEST_API = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search";
 
 export async function crawlLinkedin(): Promise<CrawlerResult> {
-  const allJobs: CrawledJob[] = [];
   const seen = new Set<string>();
+  const allJobs: CrawledJob[] = [];
 
-  for (const keyword of SEARCH_KEYWORDS) {
-    try {
+  // 7개 키워드를 병렬 요청 — 순차 대비 ~7배 빠름 (가장 느린 요청 시간만 소요)
+  const results = await Promise.allSettled(
+    SEARCH_KEYWORDS.map(async (keyword) => {
       const url = `${GUEST_API}?keywords=${encodeURIComponent(keyword)}&location=South%20Korea&start=0`;
-      const html = await fetchWithUA(url);
-      const $ = cheerio.load(html);
+      return fetchWithUA(url);
+    })
+  );
+
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    try {
+      const $ = cheerio.load(result.value);
 
       $("li").each((_, el) => {
         const $el = $(el);
@@ -37,7 +44,6 @@ export async function crawlLinkedin(): Promise<CrawlerResult> {
 
         const company = $el.find("h4").text().trim();
         const href = $el.find("a.base-card__full-link").attr("href") || "";
-        // datetime 속성이 있으면 ISO 날짜, 없으면 null
         const dateAttr = $el.find("time").attr("datetime") ?? null;
 
         allJobs.push({
@@ -46,14 +52,12 @@ export async function crawlLinkedin(): Promise<CrawlerResult> {
           company,
           start_date: dateAttr,
           end_date: null,
-          url: href.split("?")[0], // 트래킹 파라미터 제거
+          url: href.split("?")[0],
           external_id: `linkedin_${jobId}`,
         });
       });
-
-      await delay(1500);
     } catch {
-      // 키워드별 실패 시 스킵
+      // 파싱 실패 시 스킵
     }
   }
 
