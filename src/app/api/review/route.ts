@@ -1,13 +1,11 @@
 /**
  * Role: GEE-Reviewer — DB 공고 품질 검수 및 정제
  * Key Features:
- *   1. 필터 위반 공고 삭제 (비영어 언어 / 비통역 직군 / 의료 / 학원)
- *   2. 중복 공고 삭제 (title + company 완전 일치 → 최신 1건 유지)
+ *   1. 북마크된 공고는 어떤 이유로도 삭제하지 않음
+ *   2. 필터 위반 공고 삭제 (비영어 언어/국가 / 비통역 직군 / 의료 / 학원)
+ *   3. 중복 공고 삭제 (title + company 완전 일치 → 최신 1건 유지)
+ *   4. 만료 공고 삭제 (end_date < 오늘, 북마크 없는 것만)
  * Dependencies: supabase/admin, constants
- * Notes:
- *   - GEE-Research(크롤러) 완료 후 호출되어 DB를 최종 정제
- *   - CRON_SECRET으로 인증 — 외부 직접 호출 차단
- *   - 삭제는 되돌릴 수 없으므로 배치 단위로 신중하게 처리
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -20,21 +18,17 @@ import {
   RELEVANT_TITLE_KEYWORDS,
 } from "@/lib/constants";
 
-// Supabase IN 절 최대 처리 건수
 const DELETE_BATCH = 100;
 
-/**
- * DB에서 공고를 배치로 전체 조회
- */
 async function fetchAllJobs(supabase: ReturnType<typeof createAdminClient>) {
-  const jobs: { id: number; title: string; company: string; created_at: string }[] = [];
+  const jobs: { id: string; title: string; company: string; created_at: string; end_date: string | null }[] = [];
   const BATCH = 1000;
   let from = 0;
 
   while (true) {
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, title, company, created_at")
+      .select("id, title, company, created_at, end_date")
       .range(from, from + BATCH - 1)
       .order("id");
 
@@ -47,12 +41,9 @@ async function fetchAllJobs(supabase: ReturnType<typeof createAdminClient>) {
   return jobs;
 }
 
-/**
- * id 배열을 배치로 나눠 삭제
- */
 async function deleteBatch(
   supabase: ReturnType<typeof createAdminClient>,
-  ids: number[]
+  ids: string[]
 ): Promise<number> {
   let deleted = 0;
   for (let i = 0; i < ids.length; i += DELETE_BATCH) {
@@ -63,10 +54,8 @@ async function deleteBatch(
   return deleted;
 }
 
-// Vercel Cron 인증 검증 공통 함수
 function verifyCronAuth(request: NextRequest): boolean {
   if (!process.env.CRON_SECRET) return false;
-  // Vercel Cron은 GET + Authorization: Bearer, 수동 트리거는 POST + x-cron-secret
   const bearer = request.headers.get("authorization");
   if (bearer === `Bearer ${process.env.CRON_SECRET}`) return true;
   const secret = request.headers.get("x-cron-secret");
@@ -75,15 +64,25 @@ function verifyCronAuth(request: NextRequest): boolean {
 
 async function runReview() {
   const supabase = createAdminClient();
+
+  // 북마크된 공고 ID 수집 — 이 공고들은 어떤 이유로도 삭제하지 않음
+  const { data: bookmarkData } = await supabase
+    .from("bookmarks")
+    .select("job_id");
+  const bookmarkedIds = new Set((bookmarkData || []).map((b) => b.job_id));
+
   const allJobs = await fetchAllJobs(supabase);
   const total = allJobs.length;
+  const today = new Date().toISOString().split("T")[0];
 
-  const violationIds: number[] = [];
+  // 1. 필터 위반 공고 — 북마크 제외
+  const violationIds: string[] = [];
   for (const job of allJobs) {
+    if (bookmarkedIds.has(job.id)) continue; // 북마크 보호
+
     const titleLower = (job.title ?? "").toLowerCase();
     const company = job.company ?? "";
 
-    // 통번역 관련 키워드가 제목에 없으면 제외 (크롤러 검색 결과 중 무관 공고 제거)
     const isRelevant = RELEVANT_TITLE_KEYWORDS.some((kw) => titleLower.includes(kw.toLowerCase()));
     if (!isRelevant) { violationIds.push(job.id); continue; }
 
@@ -98,13 +97,14 @@ async function runReview() {
     if (isBadCompany || isMedicalTitle) { violationIds.push(job.id); continue; }
   }
 
+  // 2. 중복 공고 — 북마크 제외, 최신 1건 유지
   const violationSet = new Set(violationIds);
   const remaining = allJobs
-    .filter((j) => !violationSet.has(j.id))
+    .filter((j) => !violationSet.has(j.id) && !bookmarkedIds.has(j.id))
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const seenKeys = new Set<string>();
-  const duplicateIds: number[] = [];
+  const duplicateIds: string[] = [];
   for (const job of remaining) {
     const key = `${job.title?.trim()}|${job.company?.trim()}`;
     if (seenKeys.has(key)) {
@@ -114,13 +114,31 @@ async function runReview() {
     }
   }
 
+  // 3. 만료 공고 — 북마크 없고 end_date가 오늘 이전인 것만 삭제
+  const expiredIds = allJobs
+    .filter((j) =>
+      j.end_date !== null &&
+      j.end_date < today &&
+      !bookmarkedIds.has(j.id) &&
+      !violationSet.has(j.id) // 이미 violation으로 처리되는 건 중복 집계 방지
+    )
+    .map((j) => j.id);
+
   const deletedViolations = await deleteBatch(supabase, violationIds);
   const deletedDuplicates = await deleteBatch(supabase, duplicateIds);
+  const deletedExpired = await deleteBatch(supabase, expiredIds);
 
-  return { status: "reviewed", total, deletedViolations, deletedDuplicates, remaining: total - deletedViolations - deletedDuplicates };
+  return {
+    status: "reviewed",
+    total,
+    deletedViolations,
+    deletedDuplicates,
+    deletedExpired,
+    bookmarkProtected: bookmarkedIds.size,
+    remaining: total - deletedViolations - deletedDuplicates - deletedExpired,
+  };
 }
 
-// Vercel Cron 호출 (GET + Authorization: Bearer)
 export async function GET(request: NextRequest) {
   if (!verifyCronAuth(request)) {
     return NextResponse.json({ error: "인증 실패" }, { status: 401 });
@@ -129,7 +147,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result);
 }
 
-// 수동 트리거 (POST + x-cron-secret)
 export async function POST(request: NextRequest) {
   if (!verifyCronAuth(request)) {
     return NextResponse.json({ error: "인증 실패" }, { status: 401 });
