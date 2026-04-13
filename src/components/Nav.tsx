@@ -75,6 +75,10 @@ export default function Nav() {
           <span className="text-base">⚙️</span>
           설정
         </Link>
+        <Link href="/guide" className={menuItemClass(pathname === "/guide")}>
+          <span className="text-base">📖</span>
+          이용 가이드
+        </Link>
       </div>
 
       {/* 로그아웃 — 하단 고정 */}
