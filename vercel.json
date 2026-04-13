@@ -15,10 +15,6 @@
     {
       "path": "/api/review",
       "schedule": "30 22 * * *"
-    },
-    {
-      "path": "/api/notify",
-      "schedule": "0 23 * * *"
     }
   ]
 }
