@@ -86,9 +86,10 @@ export async function GET(request: NextRequest) {
     query = query.eq("platform", platform);
   }
 
-  // 블랙리스트 제외 — SDK 타입 안전 필터 사용
+  // 블랙리스트 제외 — PostgREST in 연산자는 괄호 형식 문자열 필요
   if (blockedNames.length > 0) {
-    query = query.not("company", "in", blockedNames);
+    const formatted = `(${blockedNames.map((n) => `"${n}"`).join(",")})`;
+    query = query.not("company", "in", formatted);
   }
 
   // 정렬
