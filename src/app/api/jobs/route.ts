@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { SortKey } from "@/lib/constants";
-import { RELEVANT_TITLE_KEYWORDS } from "@/lib/constants";
+import { RELEVANT_TITLE_KEYWORDS, POPULAR_COMPANY_KEYWORDS } from "@/lib/constants";
 import { MOCK_JOBS } from "@/lib/mock-jobs";
 
 export async function GET(request: NextRequest) {
@@ -64,6 +64,14 @@ export async function GET(request: NextRequest) {
     query = query.or(`company.ilike.%${q}%,title.ilike.%${q}%`);
   }
 
+  // 인기 기업 필터 — platform=popular 일 때 대기업/외국계/로펌 공고만 표시
+  if (platform === "popular") {
+    const popularFilter = POPULAR_COMPANY_KEYWORDS
+      .map((c) => `company.ilike.%${c}%`)
+      .join(",");
+    query = query.or(popularFilter);
+  }
+
   // 즐겨찾기 기업 필터 — platform=favorites 일 때만 적용
   if (platform === "favorites" && companies) {
     const companyList = companies.split(",").map((c) => c.trim()).filter(Boolean);
@@ -73,8 +81,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 플랫폼 필터 — favorites는 회사 키워드 필터로 대체하므로 제외
-  if (platform !== "all" && platform !== "favorites") {
+  // 플랫폼 필터 — favorites, popular는 회사 키워드 필터로 대체하므로 제외
+  if (platform !== "all" && platform !== "favorites" && platform !== "popular") {
     query = query.eq("platform", platform);
   }
 

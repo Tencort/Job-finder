@@ -92,6 +92,17 @@ export default function FilterBar({
             {p.label}
           </button>
         ))}
+        {/* 인기 탭 — 대기업/외국계/로펌 공고 */}
+        <button
+          onClick={() => onPlatformChange(platform === "popular" ? "all" : "popular")}
+          className={`px-2.5 py-1 rounded text-[11px] font-medium transition ${
+            platform === "popular"
+              ? "bg-orange-50 text-orange-600 font-semibold border border-orange-200"
+              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+          }`}
+        >
+          🔥 인기
+        </button>
         {/* 추천 탭 */}
         <button
           onClick={() => onPlatformChange(platform === "favorites" ? "all" : "favorites")}

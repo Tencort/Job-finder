@@ -35,7 +35,7 @@ export const RELEVANT_TITLE_KEYWORDS = [
 
 // 의료 관련 통역 공고 제외 필터
 // 회사명에 아래 키워드가 포함되거나, 제목에 의료 키워드가 포함된 공고는 숨김
-export const MEDICAL_COMPANY_KEYWORDS = ['병원', '의원', '클리닉', '메디컬', '치과', '한의원', '요양', '약국'];
+export const MEDICAL_COMPANY_KEYWORDS = ['병원', '의원', '클리닉', '메디컬', '치과', '한의원', '요양', '약국', '피부과', '성형외과', '성형', '피부', '에스테틱'];
 export const MEDICAL_TITLE_KEYWORDS = [
   // 복합 표현
   '의료통역', '의료 통역', '병원통역', '병원 통역', 'medical',
@@ -68,6 +68,40 @@ export const EXCLUDED_LANGUAGE_KEYWORDS = [
   'italian', 'indonesian', 'mongolian', 'malay', 'dutch', 'polish',
   'turkish', 'persian', 'swedish', 'finnish', 'danish', 'norwegian',
   'multilingual',
+];
+
+// 인기 기업 키워드 — "🔥 인기" 탭에서 사용 (회사명 부분 일치)
+export const POPULAR_COMPANY_KEYWORDS = [
+  // ── 국내 IT 대기업 (네카라쿠베 +) ──
+  '네이버', 'NAVER', '카카오', 'Kakao', '라인', 'LINE',
+  '쿠팡', 'Coupang', '우아한형제들', '배달의민족',
+  '토스', 'Toss', '당근', '카카오뱅크',
+  '넥슨', 'Nexon', '엔씨소프트', 'NCSoft', '크래프톤', 'KRAFTON',
+  '스마일게이트', 'NHN',
+  // ── 국내 대기업 그룹 ──
+  '삼성', 'Samsung', 'LG', 'SK', '현대', 'Hyundai',
+  '롯데', 'Lotte', 'CJ', '포스코', 'POSCO',
+  '한화', 'Hanwha', 'GS', '두산', 'Doosan',
+  '신세계', 'KT', '아모레퍼시픽',
+  // ── 글로벌 IT / 테크 ──
+  'Google', '구글', 'Amazon', '아마존', 'Microsoft', '마이크로소프트',
+  'Apple', '애플', 'Meta', 'Netflix', '넷플릭스',
+  'IBM', 'Oracle', '오라클', 'SAP', 'Salesforce',
+  'Adobe', 'Intel', '인텔', 'Qualcomm', '퀄컴',
+  'Tesla', '테슬라', 'NVIDIA', '엔비디아',
+  // ── 글로벌 소비재 / 제조 ──
+  'Nike', '나이키', '3M', 'P&G', 'Johnson', 'Unilever', '유니레버',
+  'Louis Vuitton', 'LVMH', 'BMW', 'Mercedes', 'Benz',
+  // ── 컨설팅 / 회계법인 ──
+  'McKinsey', '맥킨지', 'BCG', 'Bain', '베인',
+  'Deloitte', '딜로이트', 'PwC', 'EY', 'KPMG',
+  // ── 글로벌 금융 ──
+  'JP Morgan', 'JPMorgan', 'Goldman Sachs', '골드만삭스',
+  'Morgan Stanley', '모건스탠리', 'Citi', '씨티',
+  'HSBC', 'Deutsche Bank', 'BNP Paribas',
+  // ── 대형 로펌 ──
+  '김앤장', '법무법인 광장', '태평양', '율촌', '세종',
+  'Baker McKenzie', 'DLA Piper', 'Clifford Chance',
 ];
 
 export const SORT_OPTIONS = [
